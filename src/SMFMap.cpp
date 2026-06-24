@@ -15,6 +15,17 @@
 #define bzero(ptr, len) memset(ptr, 0, len)
 
 #endif
+
+// fread that fails loudly on a short read instead of silently leaving the
+// destination buffer with uninitialised/garbage data. Truncated or corrupt
+// input is unrecoverable for this tool, so we report and abort.
+static void checkedFread(void* ptr, size_t size, size_t count, FILE* f)
+{
+	if (fread(ptr, size, count, f) != count) {
+		std::cerr << "Error: unexpected end of file or read error (input truncated or corrupt)" << std::endl;
+		throw InvalidSmfFileException();
+	}
+}
 SMFMap::SMFMap(std::string name, std::string texturepath)
 {
 
@@ -57,7 +68,7 @@ SMFMap::SMFMap(std::string smfname)
 		throw CannotLoadSmfFileException();
 	}
 	SMFHeader hdr;
-	fread(&hdr, sizeof(hdr), 1, smffile);
+	checkedFread(&hdr, sizeof(hdr), 1, smffile);
 	if (strncmp(hdr.magic, "spring map file", 15) != 0) {
 		fclose(smffile);
 		throw InvalidSmfFileException();
@@ -77,7 +88,7 @@ SMFMap::SMFMap(std::string smfname)
 	metalmap = new Image();
 	metalmap->AllocateLUM(mapx / 2, mapy / 2);
 	fseek(smffile, hdr.metalmapPtr, SEEK_SET);
-	fread(metalmap->datapointer, mapx / 2 * mapy / 2, 1, smffile);
+	checkedFread(metalmap->datapointer, mapx / 2 * mapy / 2, 1, smffile);
 
 
 	std::cout << "Loading heightmap..." << std::endl;
@@ -85,21 +96,21 @@ SMFMap::SMFMap(std::string smfname)
 	heightmap->AllocateLUM(mapx + 1, mapy + 1);
 	heightmap->ConvertToLUMHDR(); // TODO: Allocate directly HDR
 	fseek(smffile, hdr.heightmapPtr, SEEK_SET);
-	fread(heightmap->datapointer, (mapx + 1) * (mapy + 1) * 2, 1, smffile);
+	checkedFread(heightmap->datapointer, (mapx + 1) * (mapy + 1) * 2, 1, smffile);
 	heightmap->FlipVertical();
 
 	std::cout << "Loading type map..." << std::endl;
 	typemap = new Image();
 	typemap->AllocateLUM(mapx / 2, mapy / 2);
 	fseek(smffile, hdr.typeMapPtr, SEEK_SET);
-	fread(typemap->datapointer, mapx / 2 * mapy / 2, 1, smffile);
+	checkedFread(typemap->datapointer, mapx / 2 * mapy / 2, 1, smffile);
 	typemap->FlipVertical();
 
 	std::cout << "Loading minimap..." << std::endl;
 	minimap = new Image();
 	uint8_t* dxt1data = new uint8_t[699064];
 	fseek(smffile, hdr.minimapPtr, SEEK_SET);
-	fread(dxt1data, 699064, 1, smffile);
+	checkedFread(dxt1data, 699064, 1, smffile);
 	ilBindImage(minimap->image);
 	ilTexImageDxtc(1024, 1024, 1, IL_DXT1, dxt1data);
 	ilDxtcDataToImage();
@@ -108,16 +119,16 @@ SMFMap::SMFMap(std::string smfname)
 
 	fseek(smffile, hdr.tilesPtr, SEEK_SET);
 	MapTileHeader thdr;
-	fread(&thdr, sizeof(thdr), 1, smffile);
+	checkedFread(&thdr, sizeof(thdr), 1, smffile);
 	while (tile_files.size() < thdr.numTileFiles) {
 		tile_files.push_back("");
 		char byte;
 		int numtiles;
-		fread(&numtiles, 4, 1, smffile);
-		fread(&byte, 1, 1, smffile);
+		checkedFread(&numtiles, 4, 1, smffile);
+		checkedFread(&byte, 1, 1, smffile);
 		while (byte != 0) {
 			tile_files[tile_files.size() - 1].append(1, byte);
-			fread(&byte, 1, 1, smffile);
+			checkedFread(&byte, 1, 1, smffile);
 		}
 	}
 	for (std::vector<std::string>::iterator it = tile_files.begin(); it != tile_files.end(); it++) {
@@ -129,7 +140,7 @@ SMFMap::SMFMap(std::string smfname)
 			throw CannotOpenSmtFileException();
 		}
 		TileFileHeader smthdr;
-		fread(&smthdr, sizeof(smthdr), 1, smtfile);
+		checkedFread(&smthdr, sizeof(smthdr), 1, smtfile);
 		if (strncmp(smthdr.magic, "spring tilefile", 14)) {
 			fclose(smffile);
 			fclose(smtfile);
@@ -138,7 +149,7 @@ SMFMap::SMFMap(std::string smfname)
 		}
 		for (int i = 0; i < smthdr.numTiles; i++) {
 			ILuint tile = ilGenImage();
-			fread(dxt1data, 680, 1, smtfile);
+			checkedFread(dxt1data, 680, 1, smtfile);
 			ilBindImage(tile);
 			ilTexImageDxtc(32, 32, 1, IL_DXT1, dxt1data);
 			ilDxtcDataToImage();
@@ -147,7 +158,7 @@ SMFMap::SMFMap(std::string smfname)
 		fclose(smtfile);
 	}
 	std::cout << "Tiles @ " << ftell(smffile) << std::endl;
-	fread(tilematrix, mapx / 4 * mapy / 4 * 4, 1, smffile);
+	checkedFread(tilematrix, mapx / 4 * mapy / 4 * 4, 1, smffile);
 	ilBindImage(texture->image);
 	unsigned int* texdata = (unsigned int*)ilGetData();
 	std::cout << "Blitting tiles..." << std::endl;
@@ -181,22 +192,22 @@ SMFMap::SMFMap(std::string smfname)
 
 	fseek(smffile, hdr.featurePtr, SEEK_SET);
 	MapFeatureHeader mfhdr;
-	fread(&mfhdr, sizeof(mfhdr), 1, smffile);
+	checkedFread(&mfhdr, sizeof(mfhdr), 1, smffile);
 	//-32767.0f+f->rotation/65535.0f*360
 
 	std::vector<std::string> feature_types;
 	while (feature_types.size() < mfhdr.numFeatureType) {
 		feature_types.push_back("");
 		char byte;
-		fread(&byte, 1, 1, smffile);
+		checkedFread(&byte, 1, 1, smffile);
 		while (byte != 0) {
 			feature_types[feature_types.size() - 1].append(1, byte);
-			fread(&byte, 1, 1, smffile);
+			checkedFread(&byte, 1, 1, smffile);
 		}
 	}
 	for (int i = 0; i < mfhdr.numFeatures; i++) {
 		MapFeatureStruct f;
-		fread(&f, sizeof(f), 1, smffile);
+		checkedFread(&f, sizeof(f), 1, smffile);
 		if (f.featureType >= feature_types.size()) {
 			std::cerr << "Warning: invalid feature type " << f.featureType << std::endl;
 			continue;
@@ -206,6 +217,8 @@ SMFMap::SMFMap(std::string smfname)
 	fclose(smffile);
 	delete[] dxt1data;
 	delete[] tilematrix;
+	if (!tiles_images.empty())
+		ilDeleteImages(tiles_images.size(), &tiles_images[0]);
 }
 
 void SMFMap::SetClamping(bool b)
@@ -512,7 +525,6 @@ void SMFMap::Compile()
     hdr.featurePtr = hdr.metalmapPtr + (mapy/2 * mapx/2);*/
 	MapFeatureHeader mfhdr;
 
-	hdr.tilesPtr = hdr.featurePtr + sizeof(mfhdr);
 	hdr.numExtraHeaders = 1;
 	ExtraHeader grassHeader;
 	grassHeader.size = 4;
