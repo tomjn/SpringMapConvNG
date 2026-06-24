@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unordered_map>
 
 
 #ifndef bzero
@@ -613,7 +614,7 @@ void SMFMap::DoCompress(int* indices, std::vector<uint64_t>& order)
 	order.clear();
 
 	uint8_t tiledata[32 * 32 * 4];
-	std::map<uint64_t, uint32_t> existingtiles;
+	std::unordered_map<uint64_t, uint32_t> existingtiles;
 	int c = 0;
 	for (int y = 0; y < mapy / 4; y++) {
 		for (int x = 0; x < mapx / 4; x++) {

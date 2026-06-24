@@ -28,16 +28,16 @@ inline uint64_t tilechecksum(uint8_t* data)
 
 inline float tilediff(uint8_t* t1, uint8_t* t2)
 {
-	float diff = 0.0;
+	// Integer reduction: branchless and auto-vectorizable. All addends are exact
+	// integers and the max sum (4096*255) is well below 2^24, so this is
+	// bit-identical to the original float accumulation regardless of SIMD ordering.
+	int total = 0;
 	for (int i = 0; i < 32 * 32 * 4; i++) {
-		float d1 = fabs(float(t1[i]) - float(t2[i]));
-		if (d1 < 30)
-			diff += d1;
-		else
-			diff += 255.0f; // If it has a point that is VERY different , it must not be reused
+		int d = int(t1[i]) - int(t2[i]);
+		d = d < 0 ? -d : d;
+		total += d < 30 ? d : 255; // A point that is VERY different must not be reused
 	}
-	diff /= 32.0 * 32.0 * 4.0f * 10.0f;
-	return diff;
+	return float(total) / (32.0f * 32.0f * 4.0f * 10.0f);
 }
 
 TileStorage::TileStorage()
@@ -52,7 +52,7 @@ TileStorage::~TileStorage()
 }
 void TileStorage::Reset()
 {
-	for (std::map<uint64_t, uint8_t*>::iterator it = m_tiles.begin(); it != m_tiles.end(); it++) {
+	for (std::unordered_map<uint64_t, uint8_t*>::iterator it = m_tiles.begin(); it != m_tiles.end(); it++) {
 		if (m_tiles_compressed.find((*it).first) != m_tiles_compressed.end()) {
 			delete[] m_tiles_compressed[(*it).first];
 		}
@@ -80,7 +80,7 @@ uint64_t TileStorage::AddTile(uint8_t* data)
 }
 void TileStorage::CompressAll()
 {
-	for (std::map<uint64_t, uint8_t*>::iterator it = m_tiles.begin(); it != m_tiles.end(); it++) {
+	for (std::unordered_map<uint64_t, uint8_t*>::iterator it = m_tiles.begin(); it != m_tiles.end(); it++) {
 		if (m_tiles_compressed.find((*it).first) == m_tiles_compressed.end()) {
 			CompressTile((*it).first);
 		}
@@ -175,7 +175,7 @@ uint64_t TileStorage::AddTileOrGetSimiliar(uint8_t* data, float th, int compress
 		return checksum;
 	}
 	if (compresslevel == COMPRESS_INSANE) {
-		for (std::map<uint64_t, uint8_t*>::iterator it = m_tiles.begin(); it != m_tiles.end(); it++) {
+		for (std::unordered_map<uint64_t, uint8_t*>::iterator it = m_tiles.begin(); it != m_tiles.end(); it++) {
 			if (tilediff(data, (*it).second) < th) {
 				return (*it).first;
 			}
