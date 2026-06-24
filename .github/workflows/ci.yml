@@ -59,3 +59,7 @@ jobs:
 
       - name: Build
         run: cmake --build build --config Release
+
+      - name: Round-trip test (.smt numTiles)
+        if: runner.os == 'Linux'
+        run: tests/smt_numtiles.sh build/mapcompile

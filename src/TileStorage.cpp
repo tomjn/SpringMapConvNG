@@ -148,7 +148,7 @@ void TileStorage::WriteToFile(FILE* f, std::vector<uint64_t>& tile_order)
 	char magic[16];
 	strcpy(magic, "spring tilefile");
 	int version = 1;
-	int numtiles = m_tiles_compressed.size();
+	int numtiles = GetTileCount();
 	int tileSize = 32;
 	int compressionType = 1;
 	fwrite(magic, 16, 1, f);
