@@ -1,14 +1,34 @@
 # SpringMapConvNG
 
-SpringMapConvNG is a map compiler for the spring rts engine.
+SpringMapConvNG is a map compiler for the spring/recoil rts engine.
 
-it also contains a decompiler, smfdecompiler.
+It also contains a decompiler, `mapdecompile`.
 
-for details see https://springrts.com/wiki/MapConvNG
+For details see https://springrts.com/wiki/MapConvNG
 
-# compile
+## Build
 
-to compile install g++/clang, cmake, DevIL-dev. then run
+You need a C++11 compiler, CMake (>= 3.10) and DevIL.
 
-    cmake .
-    make
+Install DevIL:
+
+- **Linux (Debian/Ubuntu):** `sudo apt-get install libdevil-dev`
+- **macOS (Homebrew):** `brew install devil`
+- **Windows (vcpkg):** `vcpkg install devil:x64-windows`
+
+Then configure and build out of source:
+
+    cmake -S . -B build
+    cmake --build build
+
+On Windows pass the vcpkg toolchain to the configure step:
+
+    cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=%VCPKG_INSTALLATION_ROOT%/scripts/buildsystems/vcpkg.cmake
+
+The `mapcompile` and `mapdecompile` binaries are written to `build/`.
+
+## Releases
+
+Pushing a tag of the form `1.1.1` (no leading `v`) builds binaries for Linux,
+macOS and Windows and publishes them as a GitHub release. See
+`.github/workflows/release.yml`.
