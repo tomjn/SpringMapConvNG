@@ -57,7 +57,7 @@ SMFMap::SMFMap(std::string smfname)
 	}
 	SMFHeader hdr;
 	fread(&hdr, sizeof(hdr), 1, smffile);
-	if (strncmp(hdr.magic, "spring map file", 15) > 0) {
+	if (strncmp(hdr.magic, "spring map file", 15) != 0) {
 		fclose(smffile);
 		throw InvalidSmfFileException();
 	}
