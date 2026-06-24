@@ -3,9 +3,9 @@
 #ifndef TILESTORAGE_H
 #define TILESTORAGE_H
 #include <list>
-#include <map>
 #include <stdint.h>
 #include <stdio.h>
+#include <unordered_map>
 #include <vector>
 
 class InvalidTileIndexException
@@ -38,8 +38,8 @@ public:
 private:
 	void CompressAll();
 	void CompressTile(uint64_t uid);
-	std::map<uint64_t, uint8_t*> m_tiles;
-	std::map<uint64_t, uint8_t*> m_tiles_compressed;
+	std::unordered_map<uint64_t, uint8_t*> m_tiles;
+	std::unordered_map<uint64_t, uint8_t*> m_tiles_compressed;
 	std::list<uint64_t> m_lasttiles;
 	unsigned int m_dictcount;
 };
