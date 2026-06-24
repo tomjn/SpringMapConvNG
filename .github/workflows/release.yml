@@ -39,7 +39,7 @@ jobs:
 
       - name: Install DevIL (macOS)
         if: runner.os == 'macOS'
-        run: brew install devil
+        run: brew install devil dylibbundler
 
       - name: Install DevIL (Windows)
         if: runner.os == 'Windows'
@@ -63,6 +63,32 @@ jobs:
       - name: Bundle DevIL runtime DLLs (Windows)
         if: runner.os == 'Windows'
         run: cp "$VCPKG_INSTALLATION_ROOT"/installed/x64-windows/bin/*.dll dist/bin/ || true
+
+      - name: Bundle DevIL dylibs (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          # Copy DevIL and its non-system transitive deps next to the binaries
+          # and rewrite their install names to @executable_path/libs, so the
+          # artifact runs without Homebrew installed on the user's machine.
+          dylibbundler -od -b \
+            -x dist/bin/mapcompile \
+            -x dist/bin/mapdecompile \
+            -d dist/bin/libs \
+            -p @executable_path/libs/
+
+      - name: Verify no Homebrew links remain (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          # Fail loudly if any binary or bundled dylib still references a
+          # Homebrew/local prefix, which would break on a clean machine.
+          status=0
+          for f in dist/bin/mapcompile dist/bin/mapdecompile dist/bin/libs/*.dylib; do
+            if otool -L "$f" | grep -E '/opt/homebrew|/usr/local'; then
+              echo "ERROR: $f still links a non-system prefix" >&2
+              status=1
+            fi
+          done
+          exit $status
 
       - name: Package
         run: |
