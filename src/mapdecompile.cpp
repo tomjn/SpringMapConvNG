@@ -50,7 +50,7 @@ int main(int argc, char** argv)
 						}
 						valid2 = true;
 
-					} else if (strncmp(&argv[i][1], "h", 1) == 0) //Help
+					} else if (strncmp(&argv[i][1], "h", 1) == 0) // Help
 					{
 						goto error;
 					}
