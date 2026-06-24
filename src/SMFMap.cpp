@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unordered_map>
 
 
 #ifndef bzero
@@ -68,7 +69,7 @@ SMFMap::SMFMap(std::string smfname)
 	}
 	SMFHeader hdr;
 	checkedFread(&hdr, sizeof(hdr), 1, smffile);
-	if (strncmp(hdr.magic, "spring map file", 15) > 0) {
+	if (strncmp(hdr.magic, "spring map file", 15) != 0) {
 		fclose(smffile);
 		throw InvalidSmfFileException();
 	}
@@ -548,9 +549,9 @@ void SMFMap::Compile()
     }*/
 
 	FILE* tilefile = fopen((m_name + std::string(".smt")).c_str(), "wb");
-	delete texture; // Temporarily delete texture from memory to reduce mem usage
+	delete texture; // Free texture; not used again in Compile() (the destructor handles the rest)
+	texture = NULL;
 	m_tiles->WriteToFile(tilefile, order);
-	texture = new Image(texpath.c_str());
 
 	fclose(tilefile);
 	FILE* smffile = fopen((m_name + std::string(".smf")).c_str(), "wb");
@@ -589,11 +590,11 @@ void SMFMap::Compile()
 		{
 			for (std::list<MapFeatureStruct*>::iterator it2 = (*it).second->begin(); it2 != (*it).second->end(); it2++) {
 				(*it2)->featureType = featureTypes[(*it).first];
-				if ((*it2)->ypos < 490000.0f) // Align on terrain
+				if (heightmap && (*it2)->ypos < -490000.0f) // Align on terrain
 				{
 					unsigned int hmapx = ((*it2)->xpos / float((mapx / 128) * 1024)) * heightmap->w;
 					unsigned int hmapy = ((*it2)->zpos / float((mapy / 128) * 1024)) * heightmap->h;
-					(*it2)->ypos = hdr.minHeight + (float(hmap[hmapy * (mapx + 1) + hmapx]) / 32767.0) * (hdr.maxHeight - hdr.minHeight);
+					(*it2)->ypos = hdr.minHeight + (float((unsigned short)hmap[hmapy * (mapx + 1) + hmapx]) / 65535.0f) * (hdr.maxHeight - hdr.minHeight);
 					std::cout << "Feature " << (*it).first << " Instance " << (*it2) << " Terrain height: " << (*it2)->ypos << std::endl;
 				}
 
@@ -625,7 +626,7 @@ void SMFMap::DoCompress(int* indices, std::vector<uint64_t>& order)
 	order.clear();
 
 	uint8_t tiledata[32 * 32 * 4];
-	std::map<uint64_t, uint32_t> existingtiles;
+	std::unordered_map<uint64_t, uint32_t> existingtiles;
 	int c = 0;
 	for (int y = 0; y < mapy / 4; y++) {
 		for (int x = 0; x < mapx / 4; x++) {
