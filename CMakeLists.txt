@@ -1,6 +1,14 @@
 cmake_minimum_required(VERSION 3.10)
 project(SpringMapConvNG)
 
+# Default to an optimized build: an -O0 build of the compressor is ~4x slower.
+# Only applies to single-config generators (Make/Ninja); multi-config generators
+# (e.g. Visual Studio) pick the build type at build time and ignore this.
+if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+	set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+	message(STATUS "No build type specified; defaulting to Release")
+endif ()
+
 set (CMAKE_CXX_STANDARD 11)
 
 list(PREPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)

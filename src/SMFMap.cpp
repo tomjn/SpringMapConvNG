@@ -536,9 +536,9 @@ void SMFMap::Compile()
     }*/
 
 	FILE* tilefile = fopen((m_name + std::string(".smt")).c_str(), "wb");
-	delete texture; // Temporarily delete texture from memory to reduce mem usage
+	delete texture; // Free texture; not used again in Compile() (the destructor handles the rest)
+	texture = NULL;
 	m_tiles->WriteToFile(tilefile, order);
-	texture = new Image(texpath.c_str());
 
 	fclose(tilefile);
 	FILE* smffile = fopen((m_name + std::string(".smf")).c_str(), "wb");
