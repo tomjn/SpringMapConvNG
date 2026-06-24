@@ -29,7 +29,7 @@ jobs:
           - os: windows-latest
             name: windows-x86_64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install DevIL (Linux)
         if: runner.os == 'Linux'
@@ -68,7 +68,7 @@ jobs:
         run: |
           tar -czf "SpringMapConvNG-${GITHUB_REF_NAME}-${{ matrix.name }}.tar.gz" -C dist/bin .
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: SpringMapConvNG-${{ matrix.name }}
           path: SpringMapConvNG-*.tar.gz
@@ -80,11 +80,11 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
           merge-multiple: true
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
           files: artifacts/*.tar.gz
