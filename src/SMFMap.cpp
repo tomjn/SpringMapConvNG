@@ -577,11 +577,11 @@ void SMFMap::Compile()
 		{
 			for (std::list<MapFeatureStruct*>::iterator it2 = (*it).second->begin(); it2 != (*it).second->end(); it2++) {
 				(*it2)->featureType = featureTypes[(*it).first];
-				if ((*it2)->ypos < 490000.0f) // Align on terrain
+				if (heightmap && (*it2)->ypos < -490000.0f) // Align on terrain
 				{
 					unsigned int hmapx = ((*it2)->xpos / float((mapx / 128) * 1024)) * heightmap->w;
 					unsigned int hmapy = ((*it2)->zpos / float((mapy / 128) * 1024)) * heightmap->h;
-					(*it2)->ypos = hdr.minHeight + (float(hmap[hmapy * (mapx + 1) + hmapx]) / 32767.0) * (hdr.maxHeight - hdr.minHeight);
+					(*it2)->ypos = hdr.minHeight + (float((unsigned short)hmap[hmapy * (mapx + 1) + hmapx]) / 65535.0f) * (hdr.maxHeight - hdr.minHeight);
 					std::cout << "Feature " << (*it).first << " Instance " << (*it2) << " Terrain height: " << (*it2)->ypos << std::endl;
 				}
 
