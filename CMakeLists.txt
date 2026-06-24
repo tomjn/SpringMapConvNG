@@ -29,6 +29,6 @@ endforeach()
 if (DEFINED BINDIR)
 	install(TARGETS mapcompile mapdecompile RUNTIME DESTINATION ${BINDIR})
 else ()
-	install(TARGETS mapcompile mapdecompile RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
+	install(TARGETS mapcompile mapdecompile RUNTIME DESTINATION bin)
 endif ()
 
