@@ -56,7 +56,7 @@ int main(int argc, char** argv)
 						} else {
 							goto error;
 						}
-					} else if (strcmp(&argv[i][1], "m") == 0) //Metal
+					} else if (strcmp(&argv[i][1], "m") == 0) // Metal
 					{
 						if (i + 1 < argc) {
 							metalmap = argv[++i];
@@ -64,7 +64,7 @@ int main(int argc, char** argv)
 							goto error;
 						}
 
-					} else if (strcmp(&argv[i][1], "z") == 0) //Type
+					} else if (strcmp(&argv[i][1], "z") == 0) // Type
 					{
 						if (i + 1 < argc) {
 							typemap = argv[++i];
@@ -72,7 +72,7 @@ int main(int argc, char** argv)
 							goto error;
 						}
 
-					} else if (strcmp(&argv[i][1], "h") == 0) //Height
+					} else if (strcmp(&argv[i][1], "h") == 0) // Height
 					{
 						if (i + 1 < argc) {
 							heightmap = argv[++i];
@@ -80,7 +80,7 @@ int main(int argc, char** argv)
 							goto error;
 						}
 
-					} else if (strcmp(&argv[i][1], "maxh") == 0) //Max Height
+					} else if (strcmp(&argv[i][1], "maxh") == 0) // Max Height
 					{
 						if (i + 1 < argc) {
 							maxh = atof(argv[++i]);
@@ -88,7 +88,7 @@ int main(int argc, char** argv)
 							goto error;
 						}
 
-					} else if (strcmp(&argv[i][1], "minh") == 0) //Min Height
+					} else if (strcmp(&argv[i][1], "minh") == 0) // Min Height
 					{
 						if (i + 1 < argc) {
 							minh = atof(argv[++i]);
@@ -96,7 +96,7 @@ int main(int argc, char** argv)
 							goto error;
 						}
 
-					} else if (strcmp(&argv[i][1], "o") == 0) //Output name
+					} else if (strcmp(&argv[i][1], "o") == 0) // Output name
 					{
 						if (i + 1 < argc) {
 							outputname = argv[++i];
@@ -105,7 +105,7 @@ int main(int argc, char** argv)
 						}
 						valid2 = true;
 
-					} else if (strcmp(&argv[i][1], "minimap") == 0) //Minimap
+					} else if (strcmp(&argv[i][1], "minimap") == 0) // Minimap
 					{
 						if (i + 1 < argc) {
 							minimap = argv[++i];
@@ -113,7 +113,7 @@ int main(int argc, char** argv)
 							goto error;
 						}
 
-					} else if (strcmp(&argv[i][1], "th") == 0) //Compression level
+					} else if (strcmp(&argv[i][1], "th") == 0) // Compression level
 					{
 						if (i + 1 < argc) {
 							th = atof(argv[++i]);
@@ -121,7 +121,7 @@ int main(int argc, char** argv)
 							goto error;
 						}
 
-					} else if (strcmp(&argv[i][1], "ct") == 0) //Compression mode
+					} else if (strcmp(&argv[i][1], "ct") == 0) // Compression mode
 					{
 						if (i + 1 < argc) {
 							ct = atoi(argv[++i]);
@@ -129,7 +129,7 @@ int main(int argc, char** argv)
 							goto error;
 						}
 
-					} else if (strcmp(&argv[i][1], "ccount") == 0) //Compression , count of tiles to comapre in mode 2 and 4
+					} else if (strcmp(&argv[i][1], "ccount") == 0) // Compression , count of tiles to comapre in mode 2 and 4
 					{
 						if (i + 1 < argc) {
 							tcount = atoi(argv[++i]);
@@ -137,7 +137,7 @@ int main(int argc, char** argv)
 							goto error;
 						}
 
-					} else if (strcmp(&argv[i][1], "v") == 0) //Vegetation map
+					} else if (strcmp(&argv[i][1], "v") == 0) // Vegetation map
 					{
 						if (i + 1 < argc) {
 							vegmap = argv[++i];
@@ -145,11 +145,11 @@ int main(int argc, char** argv)
 							goto error;
 						}
 
-					} else if (strcmp(&argv[i][1], "noclamp") == 0) //No heightmap clamp
+					} else if (strcmp(&argv[i][1], "noclamp") == 0) // No heightmap clamp
 					{
 						clamping = false;
 
-					} else if (strcmp(&argv[i][1], "features") == 0) //features file
+					} else if (strcmp(&argv[i][1], "features") == 0) // features file
 					{
 
 						if (i + 1 < argc) {
@@ -158,11 +158,11 @@ int main(int argc, char** argv)
 							goto error;
 						}
 
-					} else if (strcmp(&argv[i][1], "smooth") == 0) //Smooth
+					} else if (strcmp(&argv[i][1], "smooth") == 0) // Smooth
 					{
 						smooth = true;
 
-					} else if (strncmp(&argv[i][1], "h", 1) == 0) //Help
+					} else if (strncmp(&argv[i][1], "h", 1) == 0) // Help
 					{
 						goto error;
 					}

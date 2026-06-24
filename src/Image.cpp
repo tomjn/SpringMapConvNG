@@ -96,7 +96,7 @@ void Image::GetPixelRGBA(int x_, int y_, unsigned char* pix)
 	} else {
 		printf("GetPixelRGBA(%i,%i): datapointer is NULL\n", x_, y_);
 	}
-	//printf("%i %i %i\n",(int)pix[0],(int)pix[1],int(pix[2]));
+	// printf("%i %i %i\n",(int)pix[0],(int)pix[1],int(pix[2]));
 }
 
 
@@ -118,7 +118,7 @@ void Image::SetPixelLUM(int x_, int y_, char val)
 }
 void Image::GetPixelLUM(int x_, int y_, unsigned char* p)
 {
-	//printf("GetPixelLUM(%i,%i)\n",x_,y_);
+	// printf("GetPixelLUM(%i,%i)\n",x_,y_);
 	int x = x_ % w;
 	int y = y_ % h;
 	p[0] = datapointer[y * w + x];

@@ -34,7 +34,7 @@ inline float tilediff(uint8_t* t1, uint8_t* t2)
 		if (d1 < 30)
 			diff += d1;
 		else
-			diff += 255.0f; //If it has a point that is VERY different , it must not be reused
+			diff += 255.0f; // If it has a point that is VERY different , it must not be reused
 	}
 	diff /= 32.0 * 32.0 * 4.0f * 10.0f;
 	return diff;
@@ -56,7 +56,7 @@ void TileStorage::Reset()
 		if (m_tiles_compressed.find((*it).first) != m_tiles_compressed.end()) {
 			delete[] m_tiles_compressed[(*it).first];
 		}
-		delete[](*it).second;
+		delete[] (*it).second;
 	}
 	m_tiles.clear();
 	m_lasttiles.clear();
@@ -140,7 +140,7 @@ void TileStorage::CompressTile(uint64_t uid)
 	free(m3);
 
 	m_tiles_compressed[uid] = compressedmipmaps;
-	//std::cout << "Tile " << uid << " compressed!" << std::endl;
+	// std::cout << "Tile " << uid << " compressed!" << std::endl;
 }
 
 void TileStorage::WriteToFile(FILE* f, std::vector<uint64_t>& tile_order)
@@ -171,7 +171,7 @@ uint64_t TileStorage::AddTileOrGetSimiliar(uint8_t* data, float th, int compress
 {
 	uint64_t checksum = tilechecksum(data);
 	if (m_tiles.find(checksum) != m_tiles.end()) {
-		//std::cout << "Debug(AddTileOrGetSimiliar): " << checksum << " already exists" << std::endl;
+		// std::cout << "Debug(AddTileOrGetSimiliar): " << checksum << " already exists" << std::endl;
 		return checksum;
 	}
 	if (compresslevel == COMPRESS_INSANE) {
@@ -189,7 +189,7 @@ uint64_t TileStorage::AddTileOrGetSimiliar(uint8_t* data, float th, int compress
 
 
 	} else if (compresslevel == COMPRESS_SHITTY) {
-		//do nothing...
+		// do nothing...
 
 	} else if (compresslevel == COMPRESS_REASONABLE_BESTQUALITY) {
 		float mindiff = 9999999.0f;

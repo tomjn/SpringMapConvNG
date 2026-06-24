@@ -82,7 +82,7 @@ SMFMap::SMFMap(std::string smfname)
 	std::cout << "Loading heightmap..." << std::endl;
 	heightmap = new Image();
 	heightmap->AllocateLUM(mapx + 1, mapy + 1);
-	heightmap->ConvertToLUMHDR(); //TODO: Allocate directly HDR
+	heightmap->ConvertToLUMHDR(); // TODO: Allocate directly HDR
 	fseek(smffile, hdr.heightmapPtr, SEEK_SET);
 	fread(heightmap->datapointer, (mapx + 1) * (mapy + 1) * 2, 1, smffile);
 	heightmap->FlipVertical();
@@ -157,16 +157,16 @@ SMFMap::SMFMap(std::string smfname)
 				std::cerr << "Warning: tile " << tilematrix[y * (mapx / 4) + x] << " out of range" << std::endl;
 				continue;
 			}
-			//ilBlit(tiles_images[tilematrix[y*(mapx/4)+x]],x*32,y*32,0,0,0,0,32,32,1);
+			// ilBlit(tiles_images[tilematrix[y*(mapx/4)+x]],x*32,y*32,0,0,0,0,32,32,1);
 			ilBindImage(tiles_images[tilematrix[y * (mapx / 4) + x]]);
 			unsigned int* data = (unsigned int*)ilGetData();
 			int r2 = 0;
-			for (int y2 = y * 32; y2 < y * 32 + 32; y2++) //FAST blitting
+			for (int y2 = y * 32; y2 < y * 32 + 32; y2++) // FAST blitting
 			{
 				/*for ( int x2 = y*32; x2 < y*32+32; x2++ )
 	{
-	  
-	  
+
+
 	}*/
 				memcpy(&texdata[y2 * texture->w + x * 32], &data[r2 * 32], 32 * 4);
 				r2++;
@@ -221,7 +221,7 @@ void SMFMap::SaveSourceFiles()
 	}
 	if (heightmap) {
 		heightmap->Save("heightmap.png");
-		//heightmap->Save("heightmap.exr"); Not needed , png already supports 16 bit and DevIL too
+		// heightmap->Save("heightmap.exr"); Not needed , png already supports 16 bit and DevIL too
 	}
 	if (texture) {
 		texture->Save("texture.png");
@@ -271,7 +271,7 @@ void SMFMap::SetVegetationMap(std::string path)
 }
 void SMFMap::AddFeature(std::string name, float x, float y, float z, float orientation)
 {
-	if (features.find(name) == features.end()) //Allocate new vector
+	if (features.find(name) == features.end()) // Allocate new vector
 	{
 		features[name] = new std::list<MapFeatureStruct*>();
 	}
@@ -357,7 +357,7 @@ void SMFMap::SetHeightMap(std::string path)
 			std::cerr << "Warning: Height map has wrong size , rescaling! (" << img->w << "," << img->h << ") instead of (" << mapx + 1 << "," << mapy + 1 << ")" << std::endl;
 			heightmap->Rescale(mapx + 1, mapy + 1);
 		}
-		//Clamp heightmap before blurring
+		// Clamp heightmap before blurring
 		if (m_doclamp) {
 			float _min = 65537.0f;
 			float _max = -65337.0f;
@@ -462,12 +462,12 @@ void SMFMap::Compile()
 	short int* hmap = new short int[(mapy + 1) * (mapx + 1)];
 	bzero(hmap, ((mapy + 1) * (mapx + 1)) * 2);
 	if (heightmap) {
-		//heightmap->GetRect(0,0,heightmap->w,heightmap->h,IL_LUMINANCE,IL_SHORT,hmap); : IL seems to fail to convert from unsigned short to signed
+		// heightmap->GetRect(0,0,heightmap->w,heightmap->h,IL_LUMINANCE,IL_SHORT,hmap); : IL seems to fail to convert from unsigned short to signed
 		/*for ( int k = 0; k < (mapy+1)*(mapx+1); k++ )
 	{
 	  int pix = ((unsigned short*)heightmap->datapointer)[k];
 	  hmap[k] = short(int(pix)-int(32767));
-	  
+
 	  */
 		memcpy(hmap, heightmap->datapointer, ((mapy + 1) * (mapx + 1)) * 2);
 	}
@@ -485,12 +485,12 @@ void SMFMap::Compile()
 		Image* im2 = new Image();
 		im2->AllocateRGBA(1024, 1024, (char*)minimap->datapointer);
 		for (int i = 0; i < 9; i++) {
-			//std::cout << ">Mipmap " << i << std::endl;
+			// std::cout << ">Mipmap " << i << std::endl;
 			im2->Rescale(s, s);
-			//std::cout << "<Mipmap " << i << std::endl;
+			// std::cout << "<Mipmap " << i << std::endl;
 			ILuint ss;
 			ILubyte* dxtdata = ilCompressDXT(im2->datapointer, s, s, 1, IL_DXT1, &ss);
-			//std::cout << ss << " " << s;
+			// std::cout << ss << " " << s;
 			memcpy(&minimap_data[p], dxtdata, ss);
 			free(dxtdata);
 			p += ss;
@@ -536,7 +536,7 @@ void SMFMap::Compile()
     }*/
 
 	FILE* tilefile = fopen((m_name + std::string(".smt")).c_str(), "wb");
-	delete texture; //Temporarily delete texture from memory to reduce mem usage
+	delete texture; // Temporarily delete texture from memory to reduce mem usage
 	m_tiles->WriteToFile(tilefile, order);
 	texture = new Image(texpath.c_str());
 
@@ -561,19 +561,19 @@ void SMFMap::Compile()
 
 
 	mfhdr.numFeatures = 0;
-	for (std::map<std::string, std::list<MapFeatureStruct*>*>::iterator it = features.begin(); it != features.end(); it++) //Enumerate features
+	for (std::map<std::string, std::list<MapFeatureStruct*>*>::iterator it = features.begin(); it != features.end(); it++) // Enumerate features
 		mfhdr.numFeatures += (*it).second->size();
 	mfhdr.numFeatureType = features.size();
 	fwrite(&mfhdr, sizeof(mfhdr), 1, smffile);
 	{
 		std::map<std::string, unsigned int> featureTypes;
 		unsigned int z = 0;
-		for (std::map<std::string, std::list<MapFeatureStruct*>*>::iterator it = features.begin(); it != features.end(); it++) //Write feature types
+		for (std::map<std::string, std::list<MapFeatureStruct*>*>::iterator it = features.begin(); it != features.end(); it++) // Write feature types
 		{
 			fwrite((*it).first.c_str(), (*it).first.size() + 1, 1, smffile);
 			featureTypes[(*it).first] = z++;
 		}
-		for (std::map<std::string, std::list<MapFeatureStruct*>*>::iterator it = features.begin(); it != features.end(); it++) //Write feature types
+		for (std::map<std::string, std::list<MapFeatureStruct*>*>::iterator it = features.begin(); it != features.end(); it++) // Write feature types
 		{
 			for (std::list<MapFeatureStruct*>::iterator it2 = (*it).second->begin(); it2 != (*it).second->end(); it2++) {
 				(*it2)->featureType = featureTypes[(*it).first];
@@ -621,7 +621,7 @@ void SMFMap::DoCompress(int* indices, std::vector<uint64_t>& order)
 				printf("\rCompressing %8d/%8d      - %6d tiles                    ", c, mapy / 4 * mapx / 4, m_tiles->GetTileCount());
 			c++;
 			texture->GetRect(x * 32, y * 32, 32, 32, IL_RGBA, IL_UNSIGNED_BYTE, tiledata);
-			for (int yy = 0; yy < 16; yy++) //Flip vertically
+			for (int yy = 0; yy < 16; yy++) // Flip vertically
 			{
 				char tmprow[32 * 4];
 				memcpy(tmprow, &tiledata[(31 - yy) * 32 * 4], 32 * 4);
