@@ -65,7 +65,10 @@ void TileStorage::Reset()
 
 uint64_t TileStorage::AddTile(uint8_t* data)
 {
-	uint64_t checksum = tilechecksum(data);
+	return AddTile(data, tilechecksum(data));
+}
+uint64_t TileStorage::AddTile(uint8_t* data, uint64_t checksum)
+{
 	if (m_tiles.find(checksum) != m_tiles.end()) {
 		std::cerr << "Duplicate tile detected, dropping!" << std::endl;
 		return checksum;
@@ -182,7 +185,7 @@ uint64_t TileStorage::AddTileOrGetSimiliar(uint8_t* data, float th, int compress
 		}
 	} else if (compresslevel == COMPRESS_REASONABLE) {
 		for (std::list<uint64_t>::iterator it = m_lasttiles.begin(); it != m_lasttiles.end(); it++) {
-			if (tilediff(data, m_tiles[(*it)]) < th) {
+			if (tilediff(data, m_tiles.at(*it)) < th) {
 				return (*it);
 			}
 		}
@@ -195,7 +198,7 @@ uint64_t TileStorage::AddTileOrGetSimiliar(uint8_t* data, float th, int compress
 		float mindiff = 9999999.0f;
 		uint64_t besttile = 0;
 		for (std::list<uint64_t>::iterator it = m_lasttiles.begin(); it != m_lasttiles.end(); it++) {
-			float diff = tilediff(data, m_tiles[(*it)]);
+			float diff = tilediff(data, m_tiles.at(*it));
 			if (diff < mindiff) {
 				besttile = (*it);
 				mindiff = diff;
@@ -204,7 +207,7 @@ uint64_t TileStorage::AddTileOrGetSimiliar(uint8_t* data, float th, int compress
 		if (mindiff <= th)
 			return besttile;
 	}
-	return AddTile(data);
+	return AddTile(data, checksum);
 }
 uint32_t TileStorage::GetTileCount()
 {

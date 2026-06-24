@@ -36,6 +36,7 @@ public:
 	void Reset();
 
 private:
+	uint64_t AddTile(uint8_t* data, uint64_t checksum); // checksum precomputed by caller
 	void CompressAll();
 	void CompressTile(uint64_t uid);
 	std::map<uint64_t, uint8_t*> m_tiles;

@@ -13,6 +13,7 @@ Image::Image()
 	w = 0;
 	h = 0;
 	d = 0;
+	datapointer = NULL;
 }
 void Image::GetRect(int x, int y, int w, int h, ILenum format, void* dest)
 {
@@ -82,47 +83,6 @@ void Image::Rescale(int x, int y)
 	d = ilGetInteger(IL_IMAGE_DEPTH);
 }
 
-void Image::GetPixelRGBA(int x_, int y_, unsigned char* pix)
-{
-
-	int x = x_ % w;
-	int y = h - (y_ % h);
-
-	if (datapointer) {
-		pix[0] = datapointer[w * y * 4 + x * 4];
-		pix[1] = datapointer[w * y * 4 + x * 4 + 1];
-		pix[2] = datapointer[w * y * 4 + x * 4 + 2];
-		pix[3] = datapointer[w * y * 4 + x * 4 + 3];
-	} else {
-		printf("GetPixelRGBA(%i,%i): datapointer is NULL\n", x_, y_);
-	}
-	// printf("%i %i %i\n",(int)pix[0],(int)pix[1],int(pix[2]));
-}
-
-
-void Image::SetPixelRGBA(int x_, int y_, char r, char g, char b, char a)
-{
-	int x = (x_ % w);
-	int y = h - (y_ % h) - 1;
-	datapointer[w * y * 3 + x * 3] = r;
-	datapointer[w * y * 3 + x * 3 + 1] = g;
-	datapointer[w * y * 3 + x * 3 + 2] = b;
-	datapointer[w * y * 4 + x * 4 + 3] = a;
-}
-
-void Image::SetPixelLUM(int x_, int y_, char val)
-{
-	int x = x_ % w;
-	int y = y_ % h;
-	datapointer[y * w + x] = val;
-}
-void Image::GetPixelLUM(int x_, int y_, unsigned char* p)
-{
-	// printf("GetPixelLUM(%i,%i)\n",x_,y_);
-	int x = x_ % w;
-	int y = y_ % h;
-	p[0] = datapointer[y * w + x];
-}
 void Image::ConvertToLUM()
 {
 	ilBindImage(image);

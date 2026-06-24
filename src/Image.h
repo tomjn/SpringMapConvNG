@@ -7,10 +7,6 @@
 #include <stdexcept>
 #include <string>
 
-#ifdef SetPixelRGBA
-#undef SetPixelRGBA
-#endif
-
 class CannotLoadImageException : public std::runtime_error
 {
 public:
@@ -35,14 +31,6 @@ public:
 	void AllocateRGBA(int x, int y, char* data = NULL);
 
 	void Rescale(int x, int y);
-
-	void GetPixelRGBA(int x_, int y_, unsigned char* pix);
-
-	void SetPixelRGBA(int x_, int y_, char r, char g, char b, char a);
-
-	void SetPixelLUM(int x_, int y_, char val);
-
-	void GetPixelLUM(int x_, int y_, unsigned char* p);
 
 	void ConvertToLUM();
 
