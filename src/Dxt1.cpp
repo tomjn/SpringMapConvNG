@@ -24,7 +24,7 @@ void decodeBC1(const uint8_t* src, int w, int h, uint8_t* dst)
 			uint16_t c0 = (uint16_t)(blk[0] | (blk[1] << 8));
 			uint16_t c1 = (uint16_t)(blk[2] | (blk[3] << 8));
 			uint32_t bits = (uint32_t)blk[4] | ((uint32_t)blk[5] << 8) |
-			    ((uint32_t)blk[6] << 16) | ((uint32_t)blk[7] << 24);
+					((uint32_t)blk[6] << 16) | ((uint32_t)blk[7] << 24);
 
 			int r[4], g[4], b[4], a[4];
 			rgb565(c0, r[0], g[0], b[0]);

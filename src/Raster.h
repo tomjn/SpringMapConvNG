@@ -22,8 +22,14 @@ public:
 
 	Raster(int w, int h, int channels, int bytesPerChannel);
 
-	uint8_t* ptr() { return data.data(); }
-	const uint8_t* ptr() const { return data.data(); }
+	uint8_t* ptr()
+	{
+		return data.data();
+	}
+	const uint8_t* ptr() const
+	{
+		return data.data();
+	}
 
 	// Flip rows top-to-bottom (matches the decompile path's previous use of
 	// DevIL's iluFlipImage).
