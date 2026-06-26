@@ -31,6 +31,11 @@ public:
 	uint64_t AddTile(uint8_t* data); // 32x32 RGBA
 	void WriteToFile(FILE* f, std::vector<uint64_t>& tile_order);
 	uint64_t AddTileOrGetSimiliar(uint8_t* data, float th, int compresslevel);
+	// Same as above but with a checksum the caller already computed (e.g. in
+	// parallel). 32x32 RGBA.
+	uint64_t AddTileOrGetSimiliar(uint8_t* data, uint64_t checksum, float th, int compresslevel);
+	// Checksum of a 32x32 RGBA tile (the value used as its uid). Stateless.
+	static uint64_t Checksum(const uint8_t* data);
 	uint32_t GetTileCount();
 	void SetDictSize(uint32_t s);
 	void Reset();
@@ -38,7 +43,6 @@ public:
 private:
 	uint64_t AddTile(uint8_t* data, uint64_t checksum); // checksum precomputed by caller
 	void CompressAll();
-	void CompressTile(uint64_t uid);
 	std::unordered_map<uint64_t, uint8_t*> m_tiles;
 	std::unordered_map<uint64_t, uint8_t*> m_tiles_compressed;
 	std::list<uint64_t> m_lasttiles;
