@@ -1,7 +1,6 @@
 /* This file is part of SpringMapConvNG (GPL v2 or later), see the LICENSE file */
 
 #include "SMFMap.h"
-#include <IL/il.h>
 #include <iostream>
 #include <string.h>
 
@@ -21,7 +20,6 @@ void help(char** argv)
 }
 int main(int argc, char** argv)
 {
-	ilInit();
 	if (argc == 1) {
 
 		help(argv);

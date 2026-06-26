@@ -16,9 +16,13 @@ find_package(DevIL REQUIRED)
 
 set(MAPCONV_FILES
 	src/CRC.cpp
+	src/Dxt1.cpp
 	src/Image.cpp
+	src/Raster.cpp
 	src/SMFMap.cpp
 	src/TileStorage.cpp
+	src/third_party/fpng.cpp
+	src/third_party/lodepng.cpp
 )
 
 
