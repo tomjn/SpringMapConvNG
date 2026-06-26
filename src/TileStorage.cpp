@@ -2,14 +2,16 @@
 
 #include "TileStorage.h"
 #include "CRC.h"
+#include "Dxt1Encode.h"
 
-#include <IL/il.h>
-#include <IL/ilu.h>
+#include <algorithm>
+#include <atomic>
 #include <cstring>
 #include <iostream>
 #include <math.h>
 #include <sstream>
 #include <stdlib.h>
+#include <thread>
 
 inline uint64_t tilechecksum(uint8_t* data)
 {
@@ -83,67 +85,56 @@ uint64_t TileStorage::AddTile(uint8_t* data, uint64_t checksum)
 }
 void TileStorage::CompressAll()
 {
+	// Snapshot the unique tiles still needing compression, capturing each raw
+	// data pointer up front so the parallel workers below only read from stable
+	// pointers and never touch the shared maps.
+	struct Job {
+		uint64_t uid;
+		const uint8_t* src;
+	};
+	std::vector<Job> todo;
+	todo.reserve(m_tiles.size());
 	for (std::unordered_map<uint64_t, uint8_t*>::iterator it = m_tiles.begin(); it != m_tiles.end(); it++) {
 		if (m_tiles_compressed.find((*it).first) == m_tiles_compressed.end()) {
-			CompressTile((*it).first);
+			Job j = {(*it).first, (*it).second};
+			todo.push_back(j);
 		}
 	}
+	if (todo.empty())
+		return;
+
+	std::vector<uint8_t*> results(todo.size(), NULL);
+
+	// Each tile compresses independently (stb_dxt is thread-safe and stateless),
+	// so fan the work out across cores. Workers write only to their own result
+	// slot; the maps are updated single-threaded afterwards.
+	unsigned hw = std::thread::hardware_concurrency();
+	if (hw == 0)
+		hw = 1;
+	size_t nthreads = std::min<size_t>(hw, todo.size());
+	std::atomic<size_t> next(0);
+	auto worker = [&todo, &results, &next]() {
+		for (;;) {
+			size_t i = next.fetch_add(1);
+			if (i >= todo.size())
+				break;
+			uint8_t* buf = new uint8_t[680];
+			encodeTile680(todo[i].src, buf);
+			results[i] = buf;
+		}
+	};
+	std::vector<std::thread> pool;
+	for (size_t t = 0; t < nthreads; t++)
+		pool.push_back(std::thread(worker));
+	for (size_t t = 0; t < pool.size(); t++)
+		pool[t].join();
+
+	for (size_t i = 0; i < todo.size(); i++)
+		m_tiles_compressed[todo[i].uid] = results[i];
 }
 void TileStorage::SetDictSize(uint32_t s)
 {
 	m_dictcount = s;
-}
-
-void TileStorage::CompressTile(uint64_t uid)
-{
-	uint8_t* m0;
-	uint8_t* m1;
-	uint8_t* m2;
-	uint8_t* m3;
-	uint8_t* dataptr = m_tiles[uid];
-	uint8_t* compressedmipmaps = new uint8_t[680];
-	if (!dataptr) {
-		delete[] compressedmipmaps;
-		throw InvalidTileDataPointerException();
-	}
-	uint32_t s;
-	uint32_t s2 = 0;
-	ILuint mip1 = ilGenImage();
-	ilBindImage(mip1);
-	ilTexImage(32, 32, 1, 4, IL_RGBA, IL_UNSIGNED_BYTE, dataptr);
-	/*std::stringstream ss;
-  ss << "Tile" << uid << ".png";
-  ilSaveImage(ss.str().c_str());*/
-	m0 = ilCompressDXT(ilGetData(), 32, 32, 1, IL_DXT1, &s);
-	memcpy(&compressedmipmaps[s2], m0, s);
-	s2 += s;
-	iluScale(16, 16, 1);
-	m1 = ilCompressDXT(ilGetData(), 16, 16, 1, IL_DXT1, &s);
-	memcpy(&compressedmipmaps[s2], m1, s);
-	s2 += s;
-	iluScale(8, 8, 1);
-	m2 = ilCompressDXT(ilGetData(), 8, 8, 1, IL_DXT1, &s);
-	memcpy(&compressedmipmaps[s2], m2, s);
-	s2 += s;
-	iluScale(4, 4, 1);
-	m3 = ilCompressDXT(ilGetData(), 4, 4, 1, IL_DXT1, &s);
-	memcpy(&compressedmipmaps[s2], m3, s);
-	s2 += s;
-	ilDeleteImage(mip1);
-
-	/*squish::CompressImage(dataptr,32,32,m0,squish::kDxt1);
-  squish::CompressImage(dataptr,16,16,m1,squish::kDxt1);
-  squish::CompressImage(dataptr,8,8,m2,squish::kDxt1);
-  squish::CompressImage(dataptr,4,4,m3,squish::kDxt1);*/
-
-
-	free(m0);
-	free(m1);
-	free(m2);
-	free(m3);
-
-	m_tiles_compressed[uid] = compressedmipmaps;
-	// std::cout << "Tile " << uid << " compressed!" << std::endl;
 }
 
 void TileStorage::WriteToFile(FILE* f, std::vector<uint64_t>& tile_order)
@@ -170,9 +161,16 @@ void TileStorage::WriteToFile(FILE* f, std::vector<uint64_t>& tile_order)
 	}
 	fflush(f);
 }
+uint64_t TileStorage::Checksum(const uint8_t* data)
+{
+	return tilechecksum((uint8_t*)data);
+}
 uint64_t TileStorage::AddTileOrGetSimiliar(uint8_t* data, float th, int compresslevel)
 {
-	uint64_t checksum = tilechecksum(data);
+	return AddTileOrGetSimiliar(data, tilechecksum(data), th, compresslevel);
+}
+uint64_t TileStorage::AddTileOrGetSimiliar(uint8_t* data, uint64_t checksum, float th, int compresslevel)
+{
 	if (m_tiles.find(checksum) != m_tiles.end()) {
 		// std::cout << "Debug(AddTileOrGetSimiliar): " << checksum << " already exists" << std::endl;
 		return checksum;

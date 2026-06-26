@@ -2,14 +2,17 @@
 
 #include "SMFMap.h"
 #include "Dxt1.h"
+#include "Dxt1Encode.h"
 #include "Image.h"
 #include "Raster.h"
 #include "TileStorage.h"
+#include <atomic>
 #include <cstring>
 #include <iostream>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <thread>
 #include <unordered_map>
 
 
@@ -494,23 +497,19 @@ void SMFMap::Compile()
 	if (minimap) {
 		int p = 0;
 		int s = 1024;
-
-		Image* im2 = new Image();
-		im2->AllocateRGBA(1024, 1024, (char*)minimap->datapointer);
+		// Box-downscale the 1024x1024 minimap through 9 DXT1 mip levels
+		// (1024..4), the same layout the old DevIL path produced.
+		std::vector<uint8_t> level(minimap->datapointer, minimap->datapointer + (size_t)1024 * 1024 * 4);
 		for (int i = 0; i < 9; i++) {
-			// std::cout << ">Mipmap " << i << std::endl;
-			im2->Rescale(s, s);
-			// std::cout << "<Mipmap " << i << std::endl;
-			ILuint ss;
-			ILubyte* dxtdata = ilCompressDXT(im2->datapointer, s, s, 1, IL_DXT1, &ss);
-			// std::cout << ss << " " << s;
-			memcpy(&minimap_data[p], dxtdata, ss);
-			free(dxtdata);
-			p += ss;
-
-			s = s >> 1;
+			compressDXT1(level.data(), s, s, &minimap_data[p]);
+			p += s / 4 * s / 4 * 8;
+			if (s > 4) {
+				std::vector<uint8_t> next((size_t)(s / 2) * (s / 2) * 4);
+				downscaleHalfBox(level.data(), s, s, next.data());
+				level.swap(next);
+				s >>= 1;
+			}
 		}
-		delete im2;
 	}
 	unsigned char* metalmap_data = new unsigned char[mapx / 2 * mapy / 2];
 	bzero(metalmap_data, (mapy / 2 * mapx / 2));
@@ -620,39 +619,74 @@ void SMFMap::Compile()
 	delete[] grass_data;
 }
 
+// Copy one 32x32 RGBA tile straight out of the texture buffer, vertically
+// flipped to match what the old DevIL GetRect()-plus-row-swap path produced.
+static inline void extractTileFlipped(const uint8_t* texdata, int texw, int x, int y, uint8_t* out)
+{
+	for (int r = 0; r < 32; r++) {
+		const uint8_t* src = texdata + (size_t)((y * 32 + 31 - r) * texw + x * 32) * 4;
+		memcpy(&out[r * 32 * 4], src, 32 * 4);
+	}
+}
+
 void SMFMap::DoCompress(int* indices, std::vector<uint64_t>& order)
 {
 	order.clear();
 
-	uint8_t tiledata[32 * 32 * 4];
+	const int tw = mapx / 4;
+	const int tht = mapy / 4;
+	const int ntiles = tw * tht;
+	const int texw = texture->w;
+	const uint8_t* texdata = texture->datapointer;
+
+	// Phase 1 (parallel): extract every tile from the texture buffer and compute
+	// its checksum. tilechecksum is the dominant per-tile cost and each tile is
+	// independent, so fan the work out across cores. No DevIL, no shared state.
+	std::vector<uint64_t> checksums(ntiles);
+	{
+		unsigned hw = std::thread::hardware_concurrency();
+		if (hw == 0)
+			hw = 1;
+		size_t nthreads = ntiles > 0 ? std::min<size_t>(hw, (size_t)ntiles) : 0;
+		std::atomic<int> next(0);
+		auto worker = [&]() {
+			uint8_t tile[32 * 32 * 4];
+			for (;;) {
+				int i = next.fetch_add(1);
+				if (i >= ntiles)
+					break;
+				extractTileFlipped(texdata, texw, i % tw, i / tw, tile);
+				checksums[i] = TileStorage::Checksum(tile);
+			}
+		};
+		std::vector<std::thread> pool;
+		for (size_t t = 0; t < nthreads; t++)
+			pool.push_back(std::thread(worker));
+		for (size_t t = 0; t < pool.size(); t++)
+			pool[t].join();
+	}
+
+	// Phase 2 (sequential): dedup in processing order, which keeps the result
+	// byte-identical to the original single-threaded behaviour.
 	std::unordered_map<uint64_t, uint32_t> existingtiles;
-	int c = 0;
-	for (int y = 0; y < mapy / 4; y++) {
-		for (int x = 0; x < mapx / 4; x++) {
-			if (c % 50 == 0)
-				printf("\rCompressing %8d/%8d      - %6d tiles                    ", c, mapy / 4 * mapx / 4, m_tiles->GetTileCount());
-			c++;
-			texture->GetRect(x * 32, y * 32, 32, 32, IL_RGBA, IL_UNSIGNED_BYTE, tiledata);
-			for (int yy = 0; yy < 16; yy++) // Flip vertically
-			{
-				char tmprow[32 * 4];
-				memcpy(tmprow, &tiledata[(31 - yy) * 32 * 4], 32 * 4);
-				memcpy(&tiledata[(31 - yy) * 32 * 4], &tiledata[yy * 32 * 4], 32 * 4);
-				memcpy(&tiledata[yy * 32 * 4], tmprow, 32 * 4);
-			}
-			// std::cout << "Compressing (" << x << "," << y << ")" << std::endl;
-			uint64_t uid = m_tiles->AddTileOrGetSimiliar(tiledata, m_th, m_comptype);
-			if (existingtiles.find(uid) == existingtiles.end()) {
-				indices[(mapx / 4) * y + x] = order.size();
-				existingtiles[uid] = order.size();
-				order.push_back(uid);
-			} else {
-				indices[(mapx / 4) * y + x] = existingtiles[uid];
-			}
+	uint8_t tiledata[32 * 32 * 4];
+	for (int i = 0; i < ntiles; i++) {
+		if (i % 50 == 0)
+			printf("\rCompressing %8d/%8d      - %6d tiles                    ", i, ntiles, m_tiles->GetTileCount());
+		int x = i % tw;
+		int y = i / tw;
+		extractTileFlipped(texdata, texw, x, y, tiledata);
+		uint64_t uid = m_tiles->AddTileOrGetSimiliar(tiledata, checksums[i], m_th, m_comptype);
+		if (existingtiles.find(uid) == existingtiles.end()) {
+			indices[tw * y + x] = order.size();
+			existingtiles[uid] = order.size();
+			order.push_back(uid);
+		} else {
+			indices[tw * y + x] = existingtiles[uid];
 		}
 	}
 	printf("\n");
-	std::cout << "Compress done , ratio: " << float(existingtiles.size()) / float(mapy / 4 * mapx / 4) * 100.0 << std::endl;
+	std::cout << "Compress done , ratio: " << float(existingtiles.size()) / float(ntiles) * 100.0 << std::endl;
 }
 void SMFMap::SetCompressionTol(float th)
 {
