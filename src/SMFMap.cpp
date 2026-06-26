@@ -1,7 +1,9 @@
 /* This file is part of SpringMapConvNG (GPL v2 or later), see the LICENSE file */
 
 #include "SMFMap.h"
+#include "Dxt1.h"
 #include "Image.h"
+#include "Raster.h"
 #include "TileStorage.h"
 #include <cstring>
 #include <iostream>
@@ -35,6 +37,11 @@ SMFMap::SMFMap(std::string name, std::string texturepath)
 	typemap = NULL;
 	minimap = NULL;
 	vegetationmap = NULL;
+	r_metalmap = NULL;
+	r_heightmap = NULL;
+	r_typemap = NULL;
+	r_texture = NULL;
+	r_minimap = NULL;
 	texture = new Image(texturepath.c_str());
 
 	if (texture->w < 1)
@@ -55,13 +62,19 @@ SMFMap::SMFMap(std::string name, std::string texturepath)
 }
 SMFMap::SMFMap(std::string smfname)
 {
-	std::vector<ILuint> tiles_images;
 	std::vector<std::string> tile_files;
+	std::vector<std::vector<uint8_t>> tiles_rgba;
 	metalmap = NULL;
 	heightmap = NULL;
 	typemap = NULL;
 	minimap = NULL;
 	vegetationmap = NULL;
+	texture = NULL;
+	r_metalmap = NULL;
+	r_heightmap = NULL;
+	r_typemap = NULL;
+	r_texture = NULL;
+	r_minimap = NULL;
 	m_tiles = NULL;
 	FILE* smffile = fopen(smfname.c_str(), "rb");
 	if (!smffile) {
@@ -82,38 +95,34 @@ SMFMap::SMFMap(std::string smfname)
 	m_th = 0;
 	m_comptype = COMPRESS_REASONABLE;
 	m_smooth = false;
-	texture = new Image();
-	texture->AllocateRGBA((mapx / 128) * 1024, (mapy / 128) * 1024);
+	r_texture = new Raster((mapx / 128) * 1024, (mapy / 128) * 1024, 4, 1);
 	std::cout << "Loading metal map..." << std::endl;
-	metalmap = new Image();
-	metalmap->AllocateLUM(mapx / 2, mapy / 2);
+	// Orientation note: DevIL's ilSaveImage emitted PNGs with one implicit
+	// vertical flip (its images default to a lower-left origin). To reproduce
+	// the original on-disk output without DevIL, the explicit flips below are
+	// the inverse of what the old DevIL code did per map.
+	r_metalmap = new Raster(mapx / 2, mapy / 2, 1, 1);
 	fseek(smffile, hdr.metalmapPtr, SEEK_SET);
-	checkedFread(metalmap->datapointer, mapx / 2 * mapy / 2, 1, smffile);
+	checkedFread(r_metalmap->ptr(), mapx / 2 * mapy / 2, 1, smffile);
+	r_metalmap->flipVertical();
 
 
 	std::cout << "Loading heightmap..." << std::endl;
-	heightmap = new Image();
-	heightmap->AllocateLUM(mapx + 1, mapy + 1);
-	heightmap->ConvertToLUMHDR(); // TODO: Allocate directly HDR
+	r_heightmap = new Raster(mapx + 1, mapy + 1, 1, 2);
 	fseek(smffile, hdr.heightmapPtr, SEEK_SET);
-	checkedFread(heightmap->datapointer, (mapx + 1) * (mapy + 1) * 2, 1, smffile);
-	heightmap->FlipVertical();
+	checkedFread(r_heightmap->ptr(), (mapx + 1) * (mapy + 1) * 2, 1, smffile);
 
 	std::cout << "Loading type map..." << std::endl;
-	typemap = new Image();
-	typemap->AllocateLUM(mapx / 2, mapy / 2);
+	r_typemap = new Raster(mapx / 2, mapy / 2, 1, 1);
 	fseek(smffile, hdr.typeMapPtr, SEEK_SET);
-	checkedFread(typemap->datapointer, mapx / 2 * mapy / 2, 1, smffile);
-	typemap->FlipVertical();
+	checkedFread(r_typemap->ptr(), mapx / 2 * mapy / 2, 1, smffile);
 
 	std::cout << "Loading minimap..." << std::endl;
-	minimap = new Image();
+	r_minimap = new Raster(1024, 1024, 4, 1);
 	uint8_t* dxt1data = new uint8_t[699064];
 	fseek(smffile, hdr.minimapPtr, SEEK_SET);
 	checkedFread(dxt1data, 699064, 1, smffile);
-	ilBindImage(minimap->image);
-	ilTexImageDxtc(1024, 1024, 1, IL_DXT1, dxt1data);
-	ilDxtcDataToImage();
+	decodeBC1(dxt1data, 1024, 1024, r_minimap->ptr());
 	std::cout << "Extracting main texture..." << std::endl;
 	int* tilematrix = new int[mapx / 4 * mapy / 4];
 
@@ -148,44 +157,32 @@ SMFMap::SMFMap(std::string smfname)
 			throw InvalidSmtFileException();
 		}
 		for (int i = 0; i < smthdr.numTiles; i++) {
-			ILuint tile = ilGenImage();
 			checkedFread(dxt1data, 680, 1, smtfile);
-			ilBindImage(tile);
-			ilTexImageDxtc(32, 32, 1, IL_DXT1, dxt1data);
-			ilDxtcDataToImage();
-			tiles_images.push_back(tile);
+			tiles_rgba.emplace_back(32 * 32 * 4);
+			decodeBC1(dxt1data, 32, 32, tiles_rgba.back().data());
 		}
 		fclose(smtfile);
 	}
 	std::cout << "Tiles @ " << ftell(smffile) << std::endl;
 	checkedFread(tilematrix, mapx / 4 * mapy / 4 * 4, 1, smffile);
-	ilBindImage(texture->image);
-	unsigned int* texdata = (unsigned int*)ilGetData();
+	unsigned int* texdata = (unsigned int*)r_texture->ptr();
 	std::cout << "Blitting tiles..." << std::endl;
 	for (int y = 0; y < mapy / 4; y++) {
 		std::cout << "Row " << y << " of " << mapy / 4 << std::endl;
 		for (int x = 0; x < mapx / 4; x++) {
-			if (tilematrix[y * (mapx / 4) + x] >= tiles_images.size()) {
+			if (tilematrix[y * (mapx / 4) + x] >= (int)tiles_rgba.size()) {
 				std::cerr << "Warning: tile " << tilematrix[y * (mapx / 4) + x] << " out of range" << std::endl;
 				continue;
 			}
-			// ilBlit(tiles_images[tilematrix[y*(mapx/4)+x]],x*32,y*32,0,0,0,0,32,32,1);
-			ilBindImage(tiles_images[tilematrix[y * (mapx / 4) + x]]);
-			unsigned int* data = (unsigned int*)ilGetData();
+			unsigned int* data = (unsigned int*)tiles_rgba[tilematrix[y * (mapx / 4) + x]].data();
 			int r2 = 0;
 			for (int y2 = y * 32; y2 < y * 32 + 32; y2++) // FAST blitting
 			{
-				/*for ( int x2 = y*32; x2 < y*32+32; x2++ )
-	{
-
-
-	}*/
-				memcpy(&texdata[y2 * texture->w + x * 32], &data[r2 * 32], 32 * 4);
+				memcpy(&texdata[y2 * r_texture->w + x * 32], &data[r2 * 32], 32 * 4);
 				r2++;
 			}
 		}
 	}
-	texture->FlipVertical();
 
 
 	std::cout << "Loading features..." << std::endl;
@@ -217,8 +214,6 @@ SMFMap::SMFMap(std::string smfname)
 	fclose(smffile);
 	delete[] dxt1data;
 	delete[] tilematrix;
-	if (!tiles_images.empty())
-		ilDeleteImages(tiles_images.size(), &tiles_images[0]);
 }
 
 void SMFMap::SetClamping(bool b)
@@ -227,21 +222,20 @@ void SMFMap::SetClamping(bool b)
 }
 void SMFMap::SaveSourceFiles()
 {
-	if (metalmap) {
-		metalmap->Save("metalmap.png");
+	if (r_metalmap) {
+		r_metalmap->savePng("metalmap.png");
 	}
-	if (typemap) {
-		typemap->Save("typemap.png");
+	if (r_typemap) {
+		r_typemap->savePng("typemap.png");
 	}
-	if (heightmap) {
-		heightmap->Save("heightmap.png");
-		// heightmap->Save("heightmap.exr"); Not needed , png already supports 16 bit and DevIL too
+	if (r_heightmap) {
+		r_heightmap->savePng("heightmap.png");
 	}
-	if (texture) {
-		texture->Save("texture.png");
+	if (r_texture) {
+		r_texture->savePng("texture.png");
 	}
-	if (minimap) {
-		minimap->Save("minimap.png");
+	if (r_minimap) {
+		r_minimap->savePng("minimap.png");
 	}
 	FILE* featurefile = fopen("features.txt", "w");
 	for (std::map<std::string, std::list<MapFeatureStruct*>*>::iterator it = features.begin(); it != features.end(); it++) {
@@ -319,6 +313,11 @@ SMFMap::~SMFMap()
 		delete texture;
 	if (vegetationmap)
 		delete vegetationmap;
+	delete r_metalmap;
+	delete r_heightmap;
+	delete r_typemap;
+	delete r_texture;
+	delete r_minimap;
 }
 void SMFMap::SetMiniMap(std::string path)
 {

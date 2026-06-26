@@ -9,6 +9,7 @@
 #include <vector>
 
 class Image;
+class Raster;
 class TileStorage;
 
 typedef struct {
@@ -117,6 +118,14 @@ private:
 	Image* texture;
 	Image* minimap;
 	Image* vegetationmap;
+	// Decompile-only DevIL-free output buffers. The compile path uses the
+	// Image* members above; the decompile path uses these and leaves the
+	// Image* members null.
+	Raster* r_metalmap;
+	Raster* r_heightmap;
+	Raster* r_typemap;
+	Raster* r_texture;
+	Raster* r_minimap;
 	int mapx, mapy;
 	std::string m_name;
 	float m_minh;

@@ -16,10 +16,23 @@ find_package(DevIL REQUIRED)
 
 set(MAPCONV_FILES
 	src/CRC.cpp
+	src/Dxt1.cpp
 	src/Image.cpp
+	src/Raster.cpp
 	src/SMFMap.cpp
 	src/TileStorage.cpp
+	src/third_party/fpng.cpp
+	src/third_party/lodepng.cpp
 )
+
+# fpng's x86 fast path uses SSE4.1 + PCLMUL intrinsics, which GCC and Clang
+# require enabling explicitly for that translation unit. The flags are
+# unnecessary on ARM (fpng falls back to scalar there) and on MSVC (which
+# exposes the intrinsics without a flag), so restrict them to x86 GCC/Clang.
+if (NOT MSVC AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64|i[3-6]86|x86")
+	set_source_files_properties(src/third_party/fpng.cpp
+		PROPERTIES COMPILE_OPTIONS "-msse4.1;-mpclmul")
+endif ()
 
 
 add_executable(mapcompile src/mapcompile.cpp ${MAPCONV_FILES})
