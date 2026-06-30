@@ -1,6 +1,7 @@
 /* This file is part of SpringMapConvNG (GPL v2 or later), see the LICENSE file */
 
 #include "SMFMap.h"
+#include "DebugTile.h"
 #include "Dxt1.h"
 #include "Image.h"
 #include "Raster.h"
@@ -58,7 +59,58 @@ SMFMap::SMFMap(std::string name, std::string texturepath)
 	m_th = 0;
 	m_comptype = COMPRESS_REASONABLE;
 	m_smooth = false;
+	m_debug = false;
 	texpath = texturepath;
+}
+
+// Build a 1024x1024 RGBA debug minimap: the mip0 tile pattern (red + white
+// squares) tiled across the whole image. Caller owns the returned Image.
+static Image* BuildDebugMinimap()
+{
+	static const uint8_t RED[3] = { 255, 0, 0 };
+	uint8_t tile[32 * 32 * 4];
+	DrawDebugLevel(tile, 32, RED, 4);
+
+	Image* mm = new Image();
+	mm->AllocateRGBA(1024, 1024);
+	for (int y = 0; y < 1024; y++) {
+		for (int x = 0; x < 1024; x++) {
+			const int s = ((y & 31) * 32 + (x & 31)) * 4;
+			const int d = (y * 1024 + x) * 4;
+			mm->datapointer[d + 0] = tile[s + 0];
+			mm->datapointer[d + 1] = tile[s + 1];
+			mm->datapointer[d + 2] = tile[s + 2];
+			mm->datapointer[d + 3] = tile[s + 3];
+		}
+	}
+	return mm;
+}
+
+SMFMap::SMFMap(std::string name, int dw, int dh)
+{
+	m_tiles = new TileStorage();
+	metalmap = NULL;
+	heightmap = NULL;
+	typemap = NULL;
+	minimap = NULL;
+	vegetationmap = NULL;
+	r_metalmap = NULL;
+	r_heightmap = NULL;
+	r_typemap = NULL;
+	r_texture = NULL;
+	r_minimap = NULL;
+	texture = NULL;
+	mapx = dw * 128;
+	mapy = dh * 128;
+	m_minh = 0.0;
+	m_maxh = 1.0;
+	m_name = name;
+	m_doclamp = true;
+	m_th = 0;
+	m_comptype = COMPRESS_REASONABLE;
+	m_smooth = false;
+	m_debug = true;
+	minimap = BuildDebugMinimap();
 }
 SMFMap::SMFMap(std::string smfname)
 {
@@ -463,8 +515,8 @@ void SMFMap::Compile()
 	strcpy(hdr.magic, "spring map file");
 	hdr.version = 1;
 	hdr.mapid = rand();
-	hdr.mapx = (texture->w / 1024) * 128;
-	hdr.mapy = (texture->h / 1024) * 128;
+	hdr.mapx = mapx;
+	hdr.mapy = mapy;
 	hdr.squareSize = 8;
 	hdr.texelPerSquare = 8;
 	hdr.tilesize = 32;
@@ -537,7 +589,15 @@ void SMFMap::Compile()
 	}
 	int* tiles = new int[mapx / 4 * mapy / 4];
 	std::vector<uint64_t> order;
-	DoCompress(tiles, order);
+	if (m_debug) {
+		uint8_t* dbgtile = BuildDebugTile(); // 680-byte 4-level DXT1 tile
+		uint64_t uid = m_tiles->AddCompressedTile(dbgtile);
+		order.push_back(uid);
+		for (int i = 0; i < mapx / 4 * mapy / 4; i++)
+			tiles[i] = 0; // every cell -> order index 0 (the one debug tile)
+	} else {
+		DoCompress(tiles, order);
+	}
 	/* for ( int y = 0; y < mapy/4; y++ )
     {
     for ( int x = 0; x < mapx/4; x++ )
@@ -548,8 +608,10 @@ void SMFMap::Compile()
     }*/
 
 	FILE* tilefile = fopen((m_name + std::string(".smt")).c_str(), "wb");
-	delete texture; // Free texture; not used again in Compile() (the destructor handles the rest)
-	texture = NULL;
+	if (texture) {
+		delete texture; // Free texture; not used again in Compile() (the destructor handles the rest)
+		texture = NULL;
+	}
 	m_tiles->WriteToFile(tilefile, order);
 
 	fclose(tilefile);
