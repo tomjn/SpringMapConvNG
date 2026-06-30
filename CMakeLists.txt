@@ -16,6 +16,7 @@ find_package(DevIL REQUIRED)
 
 set(MAPCONV_FILES
 	src/CRC.cpp
+	src/DebugTile.cpp
 	src/Dxt1.cpp
 	src/Image.cpp
 	src/Raster.cpp
