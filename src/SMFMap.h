@@ -91,6 +91,7 @@ class SMFMap
 public:
 	SMFMap(std::string name, std::string texturepath);
 	SMFMap(std::string smfname); // Decompile
+	SMFMap(std::string name, int dw, int dh); // Debug mipmap map (synthetic, no texture)
 	virtual ~SMFMap();
 	void SetMetalMap(std::string path);
 	void SetTypeMap(std::string path);
@@ -133,6 +134,7 @@ private:
 	float m_th;
 	bool m_doclamp;
 	bool m_smooth;
+	bool m_debug;
 	int m_comptype;
 	std::string texpath;
 	std::string m_smfname;

@@ -54,10 +54,10 @@ TileStorage::~TileStorage()
 }
 void TileStorage::Reset()
 {
+	for (std::unordered_map<uint64_t, uint8_t*>::iterator it = m_tiles_compressed.begin(); it != m_tiles_compressed.end(); it++) {
+		delete[] (*it).second;
+	}
 	for (std::unordered_map<uint64_t, uint8_t*>::iterator it = m_tiles.begin(); it != m_tiles.end(); it++) {
-		if (m_tiles_compressed.find((*it).first) != m_tiles_compressed.end()) {
-			delete[] m_tiles_compressed[(*it).first];
-		}
 		delete[] (*it).second;
 	}
 	m_tiles.clear();
@@ -82,6 +82,12 @@ uint64_t TileStorage::AddTile(uint8_t* data, uint64_t checksum)
 	if (m_lasttiles.size() > m_dictcount)
 		m_lasttiles.pop_front();
 	return checksum;
+}
+uint64_t TileStorage::AddCompressedTile(uint8_t* compressed680)
+{
+	const uint64_t uid = 0;
+	m_tiles_compressed[uid] = compressed680; // ownership transferred; freed in Reset()
+	return uid;
 }
 void TileStorage::CompressAll()
 {

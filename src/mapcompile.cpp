@@ -17,6 +17,7 @@ void help(char** argv)
 	std::cout << "Compression types:\n\t1: No compression \n\t2: Fast compression , compare tile with last -ccount tiles , take first which difference is below -th\n\t3: Insane Compression: compare each tile with whole map , it is very SLOW, not recomended\n\t4: High quality Fast compression: Slightly slower than 2 , it searchs for less different tile in last -ccount tiles" << std::endl;
 	std::cout << "Feature file: Each line is a feature instance and has the fields in the following order [tdfname] [xpos] [ypos] [zpos] [rotation yaxis] , please do not leave whitespaces at the end or it\n will give errors." << std::endl;
 	std::cout << "If you specify less than -490000 as ypos , it will calculate ypos depending on terrain height" << std::endl;
+	std::cout << argv[0] << " -debugmips -dw [width] -dh [height] -o [outputsuffix]   (synthetic mip-debug map; width/height in Spring units, mapx=width*128)" << std::endl;
 }
 
 int main(int argc, char** argv)
@@ -44,6 +45,9 @@ int main(int argc, char** argv)
 		float maxh = 1.0f;
 		int ct = COMPRESS_REASONABLE;
 		float th = 0.8;
+		bool debugmips = false;
+		int dw = 0;
+		int dh = 0;
 		for (int i = 1; i < argc; i++) {
 			if (strlen(argv[i]) > 1) {
 				if (argv[i][0] == '-') {
@@ -162,6 +166,23 @@ int main(int argc, char** argv)
 					{
 						smooth = true;
 
+					} else if (strcmp(&argv[i][1], "debugmips") == 0) // Debug mipmap map
+					{
+						debugmips = true;
+					} else if (strcmp(&argv[i][1], "dw") == 0) // Debug map width (Spring units)
+					{
+						if (i + 1 < argc) {
+							dw = atoi(argv[++i]);
+						} else {
+							goto error;
+						}
+					} else if (strcmp(&argv[i][1], "dh") == 0) // Debug map height (Spring units)
+					{
+						if (i + 1 < argc) {
+							dh = atoi(argv[++i]);
+						} else {
+							goto error;
+						}
 					} else if (strncmp(&argv[i][1], "h", 1) == 0) // Help
 					{
 						goto error;
@@ -170,6 +191,11 @@ int main(int argc, char** argv)
 			}
 		}
 
+		if (debugmips) {
+			if (valid2 && dw > 0 && dh > 0)
+				goto success;
+			goto error;
+		}
 		if (valid1 && valid2)
 			goto success;
 	error:
@@ -179,7 +205,11 @@ int main(int argc, char** argv)
 		help(argv);
 		return 0;
 	success:
-		SMFMap* m = new SMFMap(outputname, texture);
+		SMFMap* m;
+		if (debugmips)
+			m = new SMFMap(outputname, dw, dh);
+		else
+			m = new SMFMap(outputname, texture);
 		m->SetBlur(smooth);
 		if (heightmap.length() > 0)
 			m->SetHeightMap(heightmap);

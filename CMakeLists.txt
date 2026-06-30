@@ -18,6 +18,7 @@ find_package(Threads REQUIRED)
 
 set(MAPCONV_FILES
 	src/CRC.cpp
+	src/DebugTile.cpp
 	src/Dxt1.cpp
 	src/Dxt1Encode.cpp
 	src/Image.cpp
