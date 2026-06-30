@@ -29,6 +29,9 @@ public:
 	TileStorage();
 	virtual ~TileStorage();
 	uint64_t AddTile(uint8_t* data); // 32x32 RGBA
+	// Store a pre-compressed 680-byte tile (4 DXT1 mip levels) directly, bypassing
+	// CompressTile and dedup. Takes ownership; freed in Reset(). Used for debug maps.
+	uint64_t AddCompressedTile(uint8_t* compressed680);
 	void WriteToFile(FILE* f, std::vector<uint64_t>& tile_order);
 	uint64_t AddTileOrGetSimiliar(uint8_t* data, float th, int compresslevel);
 	uint32_t GetTileCount();
