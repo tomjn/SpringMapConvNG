@@ -678,7 +678,154 @@ git commit -m "feat: wire -debugmips/-dw/-dh CLI flags for debug map"
 
 ---
 
-## Task 6: Verify the normal compile path is unbroken + finalise
+## Task 6: Bundle the debug-map archive template
+
+The neutral detail texture and `mapinfo.lua` live in the playable map *archive*, not in `mapcompile`'s `.smf`/`.smt` output. Commit a ready-to-copy template so the packager does not have to hand-author it. No source/code changes in this task.
+
+**Files:**
+- Create: `debug-map-template/mapinfo.lua`
+- Create: `debug-map-template/neutral_detail.png` (generated, then committed)
+- Create: `debug-map-template/README.md`
+
+- [ ] **Step 1: Create `debug-map-template/mapinfo.lua`**
+
+Trimmed from the engine template (`cont/base/springcontent/mapgenerator/mapinfo_template.lua`), with the detail texture neutralised and ground lighting set white so the debug colours stay pure:
+
+```lua
+--------------------------------------------------------------------------------
+-- mapinfo.lua for the SpringMapConvNG mipmap debug map.
+-- The diffuse colours (red/green/blue/yellow per mip level) must not be altered
+-- by the engine, so: detailTex is a neutral mid-grey (adds nothing under the
+-- signed-additive detail blend), and ground ambient/diffuse lighting is white.
+--------------------------------------------------------------------------------
+
+local mapinfo = {
+	name        = "Mipmap Debug Map",
+	shortname   = "mipdebug",
+	description = "Per-mip-level colours (red/green/blue/yellow) to visualise LOD selection",
+	author      = "SpringMapConvNG",
+	version     = "1.0",
+	-- mapfile must point at the .smf inside the archive; match your -o name.
+	mapfile     = "maps/debugmap.smf",
+	modtype     = 3, --// 3 = map
+	depend      = {"Map Helper v1"},
+
+	maphardness     = 100,
+	notDeformable   = false,
+	gravity         = 130,
+	tidalStrength   = 0,
+	maxMetal        = 0.02,
+	extractorRadius = 500.0,
+	voidWater       = false,
+	autoShowMetal   = true,
+
+	smf = {
+		minheight = 0,
+		maxheight = 100,
+	},
+
+	resources = {
+		-- Neutral detail texture: solid RGB(128,128,128). Under the shader's
+		-- (detail*2 - 1) signed-additive blend this contributes ~zero, so the
+		-- flat colours show without grain. Path is relative to the archive root;
+		-- adjust if you place the file elsewhere.
+		detailTex = "neutral_detail.png",
+	},
+
+	lighting = {
+		sunStartAngle = 0.0,
+		sunOrbitTime  = 1440.0,
+		sunDir        = {0.0, 1.0, 2.0, 1e9},
+
+		-- White ground lighting so (diffuse + detail) * shadeInt keeps the
+		-- debug colours at full brightness on the flat terrain.
+		groundAmbientColor  = {1.0, 1.0, 1.0},
+		groundDiffuseColor  = {1.0, 1.0, 1.0},
+		groundSpecularColor = {0.0, 0.0, 0.0},
+		groundShadowDensity = 0.0,
+	},
+}
+
+return mapinfo
+```
+
+- [ ] **Step 2: Generate the neutral detail texture PNG**
+
+Generate a solid RGB(128,128,128) 32x32 PNG using only the Python standard library (same technique as `tests/smt_numtiles.sh`):
+
+```bash
+python3 - debug-map-template/neutral_detail.png <<'PY'
+import sys, zlib, struct
+W = H = 32
+raw = b"".join(b"\x00" + b"\x80\x80\x80" * W for _ in range(H))  # filter 0 + RGB(128,128,128)
+def chunk(tag, data):
+    return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data) & 0xffffffff)
+png = b"\x89PNG\r\n\x1a\n"
+png += chunk(b"IHDR", struct.pack(">IIBBBBB", W, H, 8, 2, 0, 0, 0))
+png += chunk(b"IDAT", zlib.compress(raw, 9))
+png += chunk(b"IEND", b"")
+open(sys.argv[1], "wb").write(png)
+PY
+```
+
+- [ ] **Step 3: Verify the PNG is solid mid-grey**
+
+Run:
+```bash
+python3 - debug-map-template/neutral_detail.png <<'PY'
+import sys, zlib, struct
+data = open(sys.argv[1], "rb").read()
+# locate IDAT
+i = 8; idat = b""
+while i < len(data):
+    ln = struct.unpack(">I", data[i:i+4])[0]; tag = data[i+4:i+8]
+    if tag == b"IDAT": idat += data[i+8:i+8+ln]
+    i += 12 + ln
+raw = zlib.decompress(idat)
+# first scanline: filter byte then RGB triples
+assert raw[0] == 0, "unexpected filter"
+assert raw[1:4] == b"\x80\x80\x80", f"FAIL: pixel {tuple(raw[1:4])} != (128,128,128)"
+print("OK: neutral_detail.png is solid RGB(128,128,128)")
+PY
+```
+Expected: `OK: neutral_detail.png is solid RGB(128,128,128)`
+
+- [ ] **Step 4: Create `debug-map-template/README.md`**
+
+```markdown
+# Mipmap debug map - archive template
+
+`mapcompile -debugmips -dw 8 -dh 8 -o debugmap` produces `debugmap.smf` +
+`debugmap.smt` (binary map files only). To make a loadable map, package them
+into an archive (`.sd7`/`.sdd`) with this template:
+
+```
+debugmap.sdd/
+  maps/debugmap.smf
+  maps/debugmap.smt
+  mapinfo.lua            <- from this template (edit `mapfile` to match)
+  neutral_detail.png     <- from this template
+```
+
+`mapinfo.lua` neutralises the ground detail texture (solid RGB(128,128,128),
+which adds nothing under the engine's signed-additive detail blend) and sets
+white ground lighting, so the four per-mip colours show cleanly without grain.
+
+Load in Recoil with default settings (texture streaming OFF). Zooming out, the
+terrain should colour-morph red -> green -> blue -> yellow. If it stays one
+colour at all zooms, texture streaming is enabled (only mip0 is uploaded).
+```
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add debug-map-template/mapinfo.lua debug-map-template/neutral_detail.png debug-map-template/README.md
+git commit -m "feat: bundle debug-map archive template (neutral detail tex + mapinfo)"
+```
+
+---
+
+## Task 7: Verify the normal compile path is unbroken + finalise
 
 **Files:** none (regression check)
 
@@ -692,24 +839,21 @@ Expected: PASS (`OK: .smt header numTiles matches the tiles written`). This prov
 Run: `tests/debugmips.sh build/mapcompile`
 Expected: PASS.
 
-- [ ] **Step 3: Write the tester hand-off note**
+- [ ] **Step 3: Confirm the hand-off doc is in place**
 
-Because the engine cannot run on this machine, add a short note for whoever loads the map. Append to the PR description (or commit it as `docs/debug-mipmap-map.md` if preferred):
+The tester instructions live in `debug-map-template/README.md` (created in Task 6): how to package the `.smf`/`.smt` with `mapinfo.lua` + `neutral_detail.png`, why the detail texture must be neutralised, and the expected red -> green -> blue -> yellow zoom behaviour (plus the "stays one colour = streaming on" diagnostic). No separate note needed; reference this directory in the PR description.
 
-> Build a map: `mapcompile -debugmips -dw 8 -dh 8 -o debugmap` (produces `debugmap.smf` + `debugmap.smt`). Load in Recoil with **default** settings (texture streaming OFF). As you zoom out the terrain should colour-morph red -> green -> blue -> yellow (one mip level per colour; transitions cross-fade because filtering is trilinear). If the whole map stays one colour at all zooms, texture streaming is enabled (only mip0 is uploaded in that mode).
+- [ ] **Step 4: Confirm a clean tree**
 
-- [ ] **Step 4: Final commit (if a hand-off doc file was added)**
-
-```bash
-git add docs/debug-mipmap-map.md
-git commit -m "docs: add debug mipmap map tester hand-off note"
-```
+Run: `git status`
+Expected: clean (all work committed across Tasks 1-6). Nothing to commit here - this task is verification only.
 
 ---
 
 ## Self-review notes (already applied)
 
-- **Spec coverage:** per-level appearance (Task 2 `DrawDebugLevel`/`BuildDebugTile`), `-debugmips -dw -dh` invocation (Task 5), `mapx=dw*128` sizing (Task 4 ctor), flat terrain (free - `hmap` is zeroed when no heightmap; no code), synthesized minimap (Task 4 `BuildDebugMinimap`), pre-built tile bypass (Task 3), all-zero tile index (Task 4 branch), 4 automated assertions + per-level PNG eyeball aid (Task 1), hand-off verification note (Task 6). All covered.
+- **Spec coverage:** per-level appearance (Task 2 `DrawDebugLevel`/`BuildDebugTile`), `-debugmips -dw -dh` invocation (Task 5), `mapx=dw*128` sizing (Task 4 ctor), flat terrain (free - `hmap` is zeroed when no heightmap; no code), synthesized minimap (Task 4 `BuildDebugMinimap`), pre-built tile bypass (Task 3), all-zero tile index (Task 4 branch), 4 automated assertions + per-level PNG eyeball aid (Task 1), detail-texture neutralisation + `mapinfo.lua` archive template (Task 6), hand-off note + regression check (Task 7). All covered.
+- **Detail texture (engine-verified):** the ground detail texture is signed-additive in `SMFFragProg.glsl:158` (`detail*2 - 1`, then `(diffuse + detail) * shadeInt`), applied uniformly at all zoom levels, with engine default `detailtex2.bmp`. Neutralised by a solid RGB(128,128,128) detail texture + white ground lighting in the bundled `mapinfo.lua`. This is an archive concern, not part of the `.smf`/`.smt`, so it is handled in Task 6 (assets) not in `mapcompile` code.
 - **Type/name consistency:** `DrawDebugLevel(uint8_t*, int, const uint8_t[3], int)`, `BuildDebugTile() -> uint8_t*`, `TileStorage::AddCompressedTile(uint8_t*) -> uint64_t`, `SMFMap(std::string, int, int)`, member `m_debug` - used identically across tasks.
 - **No placeholders:** every code step contains the full code; every command lists expected output.
 - **`-dw`/`-dh` parse order:** added before the `strncmp(..., "h", 1)` catch-all so they are not swallowed (noted in Task 5 Step 3).
