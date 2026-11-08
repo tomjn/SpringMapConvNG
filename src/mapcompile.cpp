@@ -181,6 +181,8 @@ int main(int argc, char** argv)
 	success:
 		SMFMap* m = new SMFMap(outputname, texture);
 		m->SetBlur(smooth);
+		// SetHeightMap reads the clamping and blur options while it loads, so both must be set first.
+		m->SetClamping(clamping);
 		if (heightmap.length() > 0)
 			m->SetHeightMap(heightmap);
 		if (metalmap.length() > 0)
@@ -195,7 +197,6 @@ int main(int argc, char** argv)
 		m->SetHeightRange(minh, maxh);
 		m->SetCompressionTol(th);
 		m->SetCompressionType(ct);
-		m->SetClamping(clamping);
 		if (featurefile.length() > 0) {
 			FILE* ff = fopen(featurefile.c_str(), "r");
 			if (!ff) {

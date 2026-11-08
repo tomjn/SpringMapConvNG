@@ -63,3 +63,7 @@ jobs:
       - name: Round-trip test (.smt numTiles)
         if: runner.os == 'Linux'
         run: tests/smt_numtiles.sh build/mapcompile
+
+      - name: Round-trip test (-noclamp height words)
+        if: runner.os == 'Linux'
+        run: tests/noclamp.sh build/mapcompile
